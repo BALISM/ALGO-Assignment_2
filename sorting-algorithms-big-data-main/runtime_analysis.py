@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------ #
-#  benchmark.py  (Parts B, C, D)                                       #
+#  runtime_analysis.py  (Parts B, C, D)                               #
 #  Time bubble / selection / insertion sort on random samples drawn    #
 #  from the airline delay dataset, export results to CSV, and produce  #
 #  two runtime charts.                                                 #
@@ -10,8 +10,8 @@ import csv
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from sampling       import load_column_sample, draw_sample
-from sort_algorithms import bubble_sort, selection_sort, insertion_sort
+from data_sampler import load_column_sample, draw_sample
+from sorters      import bubble_sort, selection_sort, insertion_sort
 
 # ── Configuration ────────────────────────────────────────────────── #
 YEARLY_FILES   = ['2015.csv', '2016.csv', '2017.csv', '2018.csv']

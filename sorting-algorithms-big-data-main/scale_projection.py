@@ -1,10 +1,10 @@
 # ------------------------------------------------------------------ #
-#  extrapolate.py  (Part E)                                            #
+#  scale_projection.py  (Part E)                                       #
 #  Fit each algorithm's measured growth to t = c × n² and project     #
 #  runtime for the full loaded dataset.  Also benchmarks Python's      #
 #  built-in sorted() to show the O(n log n) speedup factor.           #
 #                                                                      #
-#  Input:  sort_benchmark_results.csv  (produced by benchmark.py)      #
+#  Input:  sort_benchmark_results.csv  (produced by runtime_analysis.py)
 #  The raw data/ CSV files are only re-read if available locally;      #
 #  otherwise a hard-coded fallback row count is used.                  #
 # ------------------------------------------------------------------ #
@@ -20,7 +20,7 @@ RESULTS_FILE = 'sort_benchmark_results.csv'
 YEARLY_FILES = ['2015.csv', '2016.csv', '2017.csv', '2018.csv']
 DATA_DIR     = './data'
 
-# Row count recorded from explore_data.py (Part A).  Used when the
+# Row count recorded from dataset_analysis.py (Part A).  Used when the
 # data/ folder is absent so the projection still has a meaningful n.
 KNOWN_TOTAL_ROWS = 24_324_804
 
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     sorted(probe_data)
     builtin_elapsed = time.perf_counter() - t_start
 
-    c_nlogn          = builtin_elapsed / (probe_n * np.log2(probe_n))
+    c_nlogn           = builtin_elapsed / (probe_n * np.log2(probe_n))
     projected_builtin = c_nlogn * full_n * np.log2(full_n)
 
     print(

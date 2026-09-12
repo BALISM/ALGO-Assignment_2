@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------ #
-#  sampling.py                                                         #
+#  data_sampler.py                                                     #
 #  Helpers for loading a single column from the chosen CSV files and   #
 #  producing the three ordering variants used in benchmarking.         #
 # ------------------------------------------------------------------ #

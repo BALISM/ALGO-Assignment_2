@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------ #
-#  check_sizes.py                                                      #
+#  file_overview.py                                                    #
 #  Print the size (MB) of every CSV in data/ and the combined total.   #
 # ------------------------------------------------------------------ #
 

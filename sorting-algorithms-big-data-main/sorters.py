@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------ #
-#  sort_algorithms.py                                                  #
+#  sorters.py                                                          #
 #  Three classic O(n^2) sorting algorithms, each implemented from     #
 #  scratch and compatible with both numeric and string data.           #
 # ------------------------------------------------------------------ #

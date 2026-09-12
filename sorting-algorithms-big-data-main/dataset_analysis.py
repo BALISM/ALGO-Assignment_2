@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------ #
-#  explore_data.py  (Part A)                                           #
+#  dataset_analysis.py  (Part A)                                       #
 #  Load all chosen yearly CSV files in chunks, report row counts,      #
 #  column names, memory usage, and basic statistics for ARR_DELAY.     #
 # ------------------------------------------------------------------ #
@@ -7,7 +7,7 @@
 import pandas as pd
 import os
 
-# Four files selected after checking sizes with check_sizes.py.
+# Four files selected after checking sizes with file_overview.py.
 # Together they cover 2015-2018 and total roughly 4 GB.
 chosen_files = ['2015.csv', '2016.csv', '2017.csv', '2018.csv']
 data_dir = './data'
