@@ -1,53 +1,62 @@
+# ------------------------------------------------------------------ #
+#  explore_data.py  (Part A)                                           #
+#  Load all chosen yearly CSV files in chunks, report row counts,      #
+#  column names, memory usage, and basic statistics for ARR_DELAY.     #
+# ------------------------------------------------------------------ #
+
 import pandas as pd
 import os
 
-# The 4 files we chose in Step 2, based on check_sizes.py output
-files = ['2015.csv', '2016.csv', '2017.csv', '2018.csv']
-folder = './data'
+# Four files selected after checking sizes with check_sizes.py.
+# Together they cover 2015-2018 and total roughly 4 GB.
+chosen_files = ['2015.csv', '2016.csv', '2017.csv', '2018.csv']
+data_dir = './data'
 
-total_rows = 0
-columns = None
-chunk_memory_mb = None
+row_total       = 0
+col_names       = None
+mem_per_chunk   = None          # MB for one 1M-row chunk
 
-for filename in files:
-    path = os.path.join(folder, filename)
-    print(f'Processing {filename}...')
+# ── Pass 1: count rows and capture schema from the very first chunk ──
+for fname in chosen_files:
+    fpath = os.path.join(data_dir, fname)
+    print(f'Processing {fname}...')
 
-    for i, chunk in enumerate(pd.read_csv(path, chunksize=1_000_000)):
-        total_rows += len(chunk)
+    for chunk_idx, chunk in enumerate(pd.read_csv(fpath, chunksize=1_000_000)):
+        row_total += len(chunk)
 
-        # Grab columns and memory footprint just once, from the very first chunk
-        if columns is None:
-            columns = list(chunk.columns)
-            chunk_memory_mb = chunk.memory_usage(deep=True).sum() / 1e6
-            print(f'  Columns ({len(columns)}): {columns}')
-            print(f'  Memory footprint of one chunk: {chunk_memory_mb:.2f} MB')
+        if col_names is None:
+            col_names     = list(chunk.columns)
+            mem_per_chunk = chunk.memory_usage(deep=True).sum() / 1e6
+            print(f'  Columns ({len(col_names)}): {col_names}')
+            print(f'  Memory footprint of one chunk: {mem_per_chunk:.2f} MB')
 
-        if i % 5 == 0:
-            print(f'  ...chunk {i}, running total rows: {total_rows:,}')
+        if chunk_idx % 5 == 0:
+            print(f'  ...chunk {chunk_idx}, running total: {row_total:,}')
 
-print(f'\nTOTAL ROWS across all 4 files: {total_rows:,}')
-# Basic stats for our chosen numeric column: ARR_DELAY
+print(f'\nTOTAL ROWS across all 4 files: {row_total:,}')
+
+# ── Pass 2: accumulate ARR_DELAY statistics without loading all at once ──
 print('\n--- ARR_DELAY statistics ---')
-stats_accum = {'min': [], 'max': [], 'sum': 0, 'count': 0, 'missing': 0}
+accum = {'min_vals': [], 'max_vals': [], 'running_sum': 0,
+         'valid_count': 0, 'missing_count': 0}
 
-for filename in files:
-    path = os.path.join(folder, filename)
-    for chunk in pd.read_csv(path, chunksize=1_000_000, usecols=['ARR_DELAY']):
+for fname in chosen_files:
+    fpath = os.path.join(data_dir, fname)
+    for chunk in pd.read_csv(fpath, chunksize=1_000_000, usecols=['ARR_DELAY']):
         col = chunk['ARR_DELAY']
-        stats_accum['min'].append(col.min())
-        stats_accum['max'].append(col.max())
-        stats_accum['sum'] += col.sum()
-        stats_accum['count'] += col.notna().sum()
-        stats_accum['missing'] += col.isna().sum()
+        accum['min_vals'].append(col.min())
+        accum['max_vals'].append(col.max())
+        accum['running_sum']  += col.sum()
+        accum['valid_count']  += col.notna().sum()
+        accum['missing_count'] += col.isna().sum()
 
-overall_min = min(stats_accum['min'])
-overall_max = max(stats_accum['max'])
-overall_mean = stats_accum['sum'] / stats_accum['count']
-total_values = stats_accum['count'] + stats_accum['missing']
-pct_missing = stats_accum['missing'] / total_values * 100
+global_min  = min(accum['min_vals'])
+global_max  = max(accum['max_vals'])
+global_mean = accum['running_sum'] / accum['valid_count']
+all_vals    = accum['valid_count'] + accum['missing_count']
+pct_missing = accum['missing_count'] / all_vals * 100
 
-print(f'Min: {overall_min}')
-print(f'Max: {overall_max}')
-print(f'Mean: {overall_mean:.2f}')
+print(f'Min:       {global_min}')
+print(f'Max:       {global_max}')
+print(f'Mean:      {global_mean:.2f}')
 print(f'% Missing: {pct_missing:.2f}%')

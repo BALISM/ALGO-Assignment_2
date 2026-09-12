@@ -1,64 +1,67 @@
-"""
-Part F: Curve fitting and full-scale extrapolation.
-
-Fits each algorithm's measured runtimes to the model  t = c * n^2
-(least squares, forced through the origin, since all three sorts are
-O(n^2) and t=0 at n=0), then uses that fitted c to project how long a
-full sort of the entire loaded dataset would take.
-
-Reads sort_benchmark_results.csv (produced by benchmark.py) - it does
-NOT need the raw data/ CSVs to fit the curve. It only re-touches the
-data/ files to count the exact number of rows to extrapolate to; if
-that folder isn't present, it falls back to FALLBACK_TOTAL_ROWS below.
-"""
+# ------------------------------------------------------------------ #
+#  extrapolate.py  (Part E)                                            #
+#  Fit each algorithm's measured growth to t = c × n² and project     #
+#  runtime for the full loaded dataset.  Also benchmarks Python's      #
+#  built-in sorted() to show the O(n log n) speedup factor.           #
+#                                                                      #
+#  Input:  sort_benchmark_results.csv  (produced by benchmark.py)      #
+#  The raw data/ CSV files are only re-read if available locally;      #
+#  otherwise a hard-coded fallback row count is used.                  #
+# ------------------------------------------------------------------ #
 
 import os
-import pandas as pd
+import time
+import random
+
 import numpy as np
+import pandas as pd
 
-RESULTS_CSV = 'sort_benchmark_results.csv'
-FILES = ['2015.csv', '2016.csv', '2017.csv', '2018.csv']
-FOLDER = './data'
+RESULTS_FILE = 'sort_benchmark_results.csv'
+YEARLY_FILES = ['2015.csv', '2016.csv', '2017.csv', '2018.csv']
+DATA_DIR     = './data'
 
-# "TOTAL ROWS across all 4 files" as printed by explore_data.py (Part A).
-# Used as a fallback if data/ isn't available when this script runs, so
-# the extrapolation still has a real n to project to.
-FALLBACK_TOTAL_ROWS = 24_324_804
+# Row count recorded from explore_data.py (Part A).  Used when the
+# data/ folder is absent so the projection still has a meaningful n.
+KNOWN_TOTAL_ROWS = 24_324_804
 
 
-def get_total_rows():
-    """Count exact rows in the chosen files if data/ is available,
-    otherwise fall back to the value already recorded from Part A."""
-    if not os.path.isdir(FOLDER):
-        print(f'{FOLDER} not found locally - using FALLBACK_TOTAL_ROWS '
-              f'from Part A output ({FALLBACK_TOTAL_ROWS:,})')
-        return FALLBACK_TOTAL_ROWS
+def count_dataset_rows():
+    """
+    Return the total row count of the loaded dataset.
+
+    Re-reads the files if data/ is present; otherwise returns the
+    pre-recorded value from Part A to keep the script portable.
+    """
+    if not os.path.isdir(DATA_DIR):
+        print(
+            f'Note: {DATA_DIR}/ not found on this machine — '
+            f'using pre-recorded row count ({KNOWN_TOTAL_ROWS:,})'
+        )
+        return KNOWN_TOTAL_ROWS
 
     total = 0
-    for filename in FILES:
-        path = os.path.join(FOLDER, filename)
-        for chunk in pd.read_csv(path, chunksize=1_000_000, usecols=['ARR_DELAY']):
-            total += len(chunk)
+    for fname in YEARLY_FILES:
+        fpath = os.path.join(DATA_DIR, fname)
+        for piece in pd.read_csv(fpath, chunksize=1_000_000, usecols=['ARR_DELAY']):
+            total += len(piece)
     return total
 
 
-def fit_c_n_squared(sizes, times):
-    """Estimate c in t = c * n^2 from the largest measured n.
-
-    We use the single largest sample (n=10,000) rather than a multi-point
-    least-squares fit, since t=0 at n=0 pins the curve at one end and the
-    largest n gives the most reliable estimate of the n^2 growth rate
-    (least relative noise from timer overhead). This matches the c values
-    reported in the Part F write-up.
+def estimate_c(sizes, times):
     """
-    n = np.array(sizes, dtype=float)
-    t = np.array(times, dtype=float)
-    idx = np.argmax(n)
-    return t[idx] / (n[idx] ** 2)
+    Estimate the constant c in  t = c × n²  from empirical measurements.
+
+    Uses the single largest measured n (most reliable signal-to-noise
+    ratio; timer overhead is proportionally smallest at large n).
+    """
+    sizes_arr = np.array(sizes, dtype=float)
+    times_arr = np.array(times, dtype=float)
+    best_idx  = np.argmax(sizes_arr)
+    return times_arr[best_idx] / (sizes_arr[best_idx] ** 2)
 
 
-def format_duration(seconds):
-    """Human-readable duration for very large extrapolated times."""
+def human_readable(seconds):
+    """Convert a duration in seconds to the most readable unit."""
     if seconds < 60:
         return f'{seconds:.2f} sec'
     minutes = seconds / 60
@@ -70,50 +73,50 @@ def format_duration(seconds):
     days = hours / 24
     if days < 365:
         return f'{days:.2f} days'
-    years = days / 365
-    return f'{years:.2f} years'
+    return f'{days / 365:.2f} years'
 
+
+# ── Main ─────────────────────────────────────────────────────────── #
 
 if __name__ == '__main__':
-    df = pd.read_csv(RESULTS_CSV)
+    bench_df = pd.read_csv(RESULTS_FILE)
 
-    # Fit on ARR_DELAY, random ordering - the baseline growth curve
-    sub = df[(df['column'] == 'ARR_DELAY') & (df['ordering'] == 'random')]
+    # Use ARR_DELAY random-order data as the representative growth curve
+    baseline = bench_df[
+        (bench_df['column']   == 'ARR_DELAY') &
+        (bench_df['ordering'] == 'random')
+    ]
 
-    total_rows = get_total_rows()
-    print(f'\nFull-scale target: {total_rows:,} rows (2015-2018 loaded set)\n')
+    full_n = count_dataset_rows()
+    print(f'\nFull-scale target: {full_n:,} rows (2015-2018 loaded set)\n')
 
-    print(f'{"Algorithm":<16}{"Fitted c":>14}{"Projected time":>18}')
+    header = f'{"Algorithm":<16}{"Fitted c":>14}{"Projected time":>18}'
+    print(header)
     print('-' * 48)
 
-    fitted = {}
-    for algo in sub['algorithm'].unique():
-        algo_rows = sub[sub['algorithm'] == algo].sort_values('size')
-        c = fit_c_n_squared(algo_rows['size'], algo_rows['time_seconds'])
-        fitted[algo] = c
+    c_values = {}
+    for algo in baseline['algorithm'].unique():
+        algo_df = baseline[baseline['algorithm'] == algo].sort_values('size')
+        c = estimate_c(algo_df['size'].tolist(), algo_df['time_seconds'].tolist())
+        c_values[algo] = c
+        projected = c * (full_n ** 2)
+        print(f'{algo:<16}{c:>14.3e}{human_readable(projected):>18}')
 
-        projected_seconds = c * (total_rows ** 2)
-        print(f'{algo:<16}{c:>14.3e}{format_duration(projected_seconds):>18}')
+    # ── O(n log n) baseline: time Python's built-in sorted() ────── #
+    probe_n    = 10_000
+    probe_data = [random.random() for _ in range(probe_n)]
+    t_start    = time.perf_counter()
+    sorted(probe_data)
+    builtin_elapsed = time.perf_counter() - t_start
 
-    # --- O(n log n) comparison, for the "Key Findings" line in the README ---
-    # Python's built-in Timsort is O(n log n); benchmark it directly at a
-    # small n and extrapolate the same way, using t = c * n * log2(n).
-    import time
-    import random
+    c_nlogn          = builtin_elapsed / (probe_n * np.log2(probe_n))
+    projected_builtin = c_nlogn * full_n * np.log2(full_n)
 
-    sample_n = 10000
-    sample = [random.random() for _ in range(sample_n)]
-    start = time.perf_counter()
-    sorted(sample)
-    builtin_time = time.perf_counter() - start
+    print(
+        f'\n{"builtin (Timsort)":<16}{c_nlogn:>14.3e}'
+        f'{human_readable(projected_builtin):>18}'
+    )
 
-    c_nlogn = builtin_time / (sample_n * np.log2(sample_n))
-    projected_builtin = c_nlogn * total_rows * np.log2(total_rows)
-
-    print(f'\n{"builtin (Timsort)":<16}{c_nlogn:>14.3e}'
-          f'{format_duration(projected_builtin):>18}')
-
-    slowest_quadratic = max(fitted.values()) * (total_rows ** 2)
-    speedup = slowest_quadratic / projected_builtin
-    print(f'\nO(n^2) vs O(n log n) speedup factor at full scale: '
-          f'{speedup:,.0f}x')
+    slowest_quad = max(c_values.values()) * (full_n ** 2)
+    speedup      = slowest_quad / projected_builtin
+    print(f'\nO(n²) vs O(n log n) speedup factor at full scale: {speedup:,.0f}x')
